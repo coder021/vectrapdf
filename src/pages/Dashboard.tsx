@@ -1,34 +1,42 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FiUpload, FiFileText, FiUser, FiLogOut, FiSettings, FiTarget, FiDownload } from 'react-icons/fi';
+import { FiUpload, FiFileText, FiUser, FiLogOut, FiSettings, FiTarget, FiDownload, FiVolume2, FiEye, FiClock } from 'react-icons/fi';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { Button } from '../components/ui/button-enhanced';
 import { useToast } from '../hooks/use-toast';
+import { ProcessingModal } from '../components/ProcessingModal';
+import { useNavigate } from 'react-router-dom';
 
 export const Dashboard: React.FC = () => {
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [persona, setPersona] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<string[]>([]);
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
   
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const handleFileUpload = (file: File) => {
-    if (file.type !== 'application/pdf') {
+  const handleFileUpload = (files: File[]) => {
+    const validFiles = files.filter(file => file.type === 'application/pdf');
+    const invalidFiles = files.filter(file => file.type !== 'application/pdf');
+    
+    if (invalidFiles.length > 0) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF file.",
+        description: `${invalidFiles.length} file(s) were not PDF format and were skipped.`,
         variant: "destructive"
       });
-      return;
     }
     
-    setUploadedFile(file);
-    toast({
-      title: "File uploaded",
-      description: `${file.name} has been uploaded successfully.`,
-    });
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      toast({
+        title: "Files uploaded",
+        description: `${validFiles.length} PDF file(s) uploaded successfully.`,
+      });
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -36,23 +44,23 @@ export const Dashboard: React.FC = () => {
     setIsDragOver(false);
     
     const files = Array.from(e.dataTransfer.files);
-    if (files[0]) {
-      handleFileUpload(files[0]);
+    if (files.length > 0) {
+      handleFileUpload(files);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files[0]) {
-      handleFileUpload(files[0]);
+    if (files && files.length > 0) {
+      handleFileUpload(Array.from(files));
     }
   };
 
   const handleProcess = () => {
-    if (!uploadedFile || !persona.trim()) {
+    if (uploadedFiles.length === 0 || !persona.trim()) {
       toast({
         title: "Missing information",
-        description: "Please upload a PDF and provide a persona/task.",
+        description: "Please upload at least one PDF and provide a persona/task.",
         variant: "destructive"
       });
       return;
@@ -63,21 +71,49 @@ export const Dashboard: React.FC = () => {
     // Simulate AI processing
     setTimeout(() => {
       const mockResults = [
-        "Key Insight 1: This document contains important financial projections for Q4 2024.",
+        "Key Insight 1: Combined analysis shows important financial projections for Q4 2024.",
         "Key Insight 2: Revenue is expected to increase by 15% compared to the previous quarter.",
         "Key Insight 3: The marketing budget allocation shows a focus on digital channels.",
         "Key Insight 4: Customer acquisition costs have decreased by 8% year-over-year.",
-        "Key Insight 5: The document highlights three strategic initiatives for market expansion."
+        "Key Insight 5: Documents highlight three strategic initiatives for market expansion.",
+        "Key Insight 6: Cross-document analysis reveals consistent growth trends.",
+        "Key Insight 7: Risk factors are well-documented across multiple sources."
       ];
       
       setResults(mockResults);
       setIsProcessing(false);
+      setShowProcessingModal(true);
+    }, 3000);
+  };
+
+  const speakResults = () => {
+    if ('speechSynthesis' in window && results.length > 0) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const text = results.join('. ');
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+      
+      window.speechSynthesis.speak(utterance);
       
       toast({
-        title: "Processing complete!",
-        description: "Your PDF has been analyzed and insights extracted.",
+        title: "Reading results",
+        description: "Text-to-speech is reading your insights aloud.",
       });
-    }, 3000);
+    } else {
+      toast({
+        title: "Speech not supported",
+        description: "Your browser doesn't support text-to-speech.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(files => files.filter((_, i) => i !== index));
   };
 
   return (
@@ -92,19 +128,22 @@ export const Dashboard: React.FC = () => {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gradient">Vectra PDF</h1>
+            <div className="flex items-center space-x-6">
+              <h1 className="text-2xl font-bold text-gradient">Vpdf</h1>
+              <Button variant="ghost" size="sm" icon={<FiClock size={18} />} onClick={() => navigate('/history')}>
+                History
+              </Button>
             </div>
             
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" icon={<FiSettings size={18} />}>
+              <Button variant="ghost" size="sm" icon={<FiSettings size={18} />} onClick={() => navigate('/settings')}>
                 Settings
               </Button>
-              <div className="flex items-center space-x-2 px-3 py-2 glass rounded-lg">
+              <div className="flex items-center space-x-2 px-3 py-2 glass rounded-lg cursor-pointer" onClick={() => navigate('/profile')}>
                 <FiUser size={18} className="text-vectra-text-secondary" />
                 <span className="text-sm text-vectra-text-primary">John Doe</span>
               </div>
-              <Button variant="ghost" size="sm" icon={<FiLogOut size={18} />}>
+              <Button variant="ghost" size="sm" icon={<FiLogOut size={18} />} onClick={() => navigate('/login')}>
                 Logout
               </Button>
             </div>
@@ -123,13 +162,26 @@ export const Dashboard: React.FC = () => {
             transition={{ duration: 0.6 }}
             className="space-y-6"
           >
-            <div>
-              <h2 className="text-xl font-semibold text-vectra-text-primary mb-2">
-                Upload PDF Document
-              </h2>
-              <p className="text-sm text-vectra-text-secondary">
-                Upload your PDF file to extract AI-powered insights
-              </p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-semibold text-vectra-text-primary mb-2">
+                  Upload PDF Documents
+                </h2>
+                <p className="text-sm text-vectra-text-secondary">
+                  Upload multiple PDF files to extract AI-powered insights
+                </p>
+              </div>
+              
+              {uploadedFiles.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  icon={<FiEye size={16} />}
+                  onClick={() => navigate('/pdf-preview')}
+                >
+                  Preview ({uploadedFiles.length})
+                </Button>
+              )}
             </div>
 
             {/* File Upload Area */}
@@ -138,7 +190,7 @@ export const Dashboard: React.FC = () => {
                 isDragOver
                   ? 'border-primary bg-primary/5'
                   : 'border-vectra-border hover:border-primary/50'
-              } ${uploadedFile ? 'bg-vectra-surface/30' : ''}`}
+              } ${uploadedFiles.length > 0 ? 'bg-vectra-surface/30' : ''}`}
               onDrop={handleDrop}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -146,7 +198,7 @@ export const Dashboard: React.FC = () => {
               }}
               onDragLeave={() => setIsDragOver(false)}
             >
-              {uploadedFile ? (
+              {uploadedFiles.length > 0 ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -154,18 +206,32 @@ export const Dashboard: React.FC = () => {
                 >
                   <FiFileText size={48} className="mx-auto text-primary" />
                   <div>
-                    <p className="font-medium text-vectra-text-primary">{uploadedFile.name}</p>
+                    <p className="font-medium text-vectra-text-primary">
+                      {uploadedFiles.length} PDF file{uploadedFiles.length > 1 ? 's' : ''} selected
+                    </p>
                     <p className="text-sm text-vectra-text-secondary">
-                      {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                      {uploadedFiles.map(f => f.name).join(', ')}
+                    </p>
+                    <p className="text-xs text-vectra-text-secondary mt-1">
+                      Total: {(uploadedFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setUploadedFile(null)}
-                  >
-                    Remove File
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUploadedFiles([])}
+                    >
+                      Clear All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/pdf-preview')}
+                    >
+                      Preview Files
+                    </Button>
+                  </div>
                 </motion.div>
               ) : (
                 <>
@@ -181,6 +247,7 @@ export const Dashboard: React.FC = () => {
                   <input
                     type="file"
                     accept=".pdf"
+                    multiple
                     onChange={handleFileSelect}
                     className="hidden"
                     id="file-upload"
@@ -215,7 +282,7 @@ export const Dashboard: React.FC = () => {
               className="w-full"
               onClick={handleProcess}
               loading={isProcessing}
-              disabled={!uploadedFile || !persona.trim()}
+              disabled={uploadedFiles.length === 0 || !persona.trim()}
             >
               {isProcessing ? 'Processing PDF...' : 'Extract Insights'}
             </Button>
@@ -260,9 +327,14 @@ export const Dashboard: React.FC = () => {
                     <h3 className="font-medium text-vectra-text-primary">
                       Key Insights ({results.length})
                     </h3>
-                    <Button variant="outline" size="sm" icon={<FiDownload size={16} />}>
-                      Export
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" icon={<FiVolume2 size={16} />} onClick={speakResults}>
+                        Listen
+                      </Button>
+                      <Button variant="outline" size="sm" icon={<FiDownload size={16} />}>
+                        Export
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="space-y-3">
@@ -289,7 +361,7 @@ export const Dashboard: React.FC = () => {
                       No insights yet
                     </p>
                     <p className="text-sm text-vectra-text-secondary/70">
-                      Upload a PDF and provide a persona to get started
+                      Upload PDF files and provide a persona to get started
                     </p>
                   </div>
                 </div>
@@ -298,6 +370,17 @@ export const Dashboard: React.FC = () => {
           </motion.div>
         </div>
       </div>
+      
+      <ProcessingModal
+        isOpen={showProcessingModal}
+        onOpenChange={setShowProcessingModal}
+        onViewResults={() => {
+          setShowProcessingModal(false);
+          // Results are already visible, could scroll to them
+        }}
+        fileName={uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s)` : undefined}
+        persona={persona}
+      />
     </div>
   );
 };
