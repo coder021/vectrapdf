@@ -47,6 +47,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, loading, icon, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     
+    // When using asChild, we can't wrap with motion.div or add extra elements
+    if (asChild) {
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </Comp>
+      );
+    }
+    
+    // Regular button with motion wrapper
     return (
       <motion.div
         whileHover={{ scale: variant === "primary" ? 1.02 : 1.01 }}
